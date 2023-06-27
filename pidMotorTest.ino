@@ -26,10 +26,8 @@ volatile long encoderValue2 = 0;
 int interval = 650;
 long previousMillis = 0;
 long currentMillis = 0;
-
 int rpm1 = 0;
 int rpm2 = 0;
-
 int motorPwm1 = 0;
 int motorPwm2 = 0;
 float diff1 = 0;
