@@ -7,6 +7,7 @@
 // Sb 10 - 11 --> PWM 90
 // Blower 9 --> PWM -- FB 2
 // limit Switch 15 - 16
+
 const int HALLSEN_A = 20;
 const int HALLSEN_B = 21;
 
