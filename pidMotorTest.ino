@@ -7,7 +7,6 @@
 // Sb 10 - 11 --> PWM 90
 // Blower 9 --> PWM -- FB 2
 // limit Switch 15 - 16
-
 const int HALLSEN_A = 20;
 const int HALLSEN_B = 21;
 
@@ -27,8 +26,10 @@ volatile long encoderValue2 = 0;
 int interval = 650;
 long previousMillis = 0;
 long currentMillis = 0;
+
 int rpm1 = 0;
 int rpm2 = 0;
+
 int motorPwm1 = 0;
 int motorPwm2 = 0;
 float diff1 = 0;
@@ -40,9 +41,12 @@ double input, output;
 int pwm = 0;
 int pwm2 = 0;
 int readDir = 0;
-extern int mspeed1 = 0;
-extern int mspeed2 = 0;
-int setPoint = 80;  // Desired speed in RPM
+
+volatile int mspeed1 = 0;
+volatile int mspeed2 = 0;
+
+int setPoint = 20;  // Desired speed in RPM
+
 void setup() {
   Serial.begin(9600);
   pinMode(HALLSEN_A, INPUT);
@@ -54,8 +58,6 @@ void setup() {
   pinMode(motorDir2, OUTPUT);
   pinMode(motor2Dir, OUTPUT);
   pinMode(motor2Dir2, OUTPUT);
-  encoderValue1 = 0;
-  encoderValue2 = 0;
   previousMillis = millis();
   pinMode(43, INPUT);
   pinMode(45, OUTPUT);
@@ -75,7 +77,7 @@ void setup() {
   pinMode(15, INPUT);
   pinMode(16, INPUT);
 }
-
+int counter = 0; 
 void loop() {
   int ls1 = analogRead(15);
   int ls2 = analogRead(16);
@@ -109,13 +111,27 @@ void loop() {
       mspeed2 = 255;
     }
 
-    int dir1 = 1;
-    digitalWrite(motorDir2, dir1);
-    digitalWrite(motorDir, !dir1);
-    analogWrite(motor2PWM, mspeed2);
-    digitalWrite(motor2Dir2, dir1);
-    digitalWrite(motor2Dir, !dir1);
-    analogWrite(motorPWM, mspeed1);
+    counter++;
+
+    if ( counter == 5)
+    {
+      counter = 0;
+      if(rpm1 < 10)
+      {
+        mspeed1 = 40;
+      }
+      if(rpm2 < 10)
+      {
+        mspeed2 = 40;
+      }
+    }
+    int dir1 = 0;
+    // digitalWrite(motorDir2, dir1);
+    // digitalWrite(motorDir, !dir1);
+    // analogWrite(motor2PWM, mspeed2);
+    // digitalWrite(motor2Dir2, dir1);
+    // digitalWrite(motor2Dir, !dir1);
+    // analogWrite(motorPWM, mspeed1);
     Serial.print("Speed1: ");
     Serial.print(mspeed1);
     Serial.print(", Speed2: ");
@@ -124,52 +140,51 @@ void loop() {
     Serial.print(rpm1);
     Serial.print(", RPM2: ");
     Serial.println(rpm2);
-    if (Serial.available()) {
-      char direction = Serial.read();
-      switch (direction) {
-        case 'a':
-          {
-            setmotor(4);
-            Serial.println(direction);
-            break;
-          }
-        case 'd':
-
-          {
-            setmotor(3);
-            Serial.println(direction);
-            break;
-          }
-        case 'w':
-          {
-            setmotor(1);
-            Serial.println(direction);
-            break;
-          }
-        case 's':
-          // right
-          {
-            digitalWrite(motorDir2, 0);
-            digitalWrite(motorDir, 1);
-            analogWrite(motor2PWM, mspeed2);
-            digitalWrite(motor2Dir2, 0);
-            digitalWrite(motor2Dir, 1);
-            analogWrite(motorPWM, mspeed1);
-            Serial.println(direction);
-            break;
-          }
-        case 'x':
-          {
-            setmotor(0);
-            Serial.println(direction);
-            break;
-          }
-        default:
+    char direction = Serial.read();
+    switch (direction) {
+      case 'a':
+        {
+          setmotor(4);
+          Serial.println(direction);
           break;
-      }
+        }
+      case 'd':
+
+        {
+          setmotor(3);
+          Serial.println(direction);
+          break;
+        }
+      case 'w':
+        {
+          setmotor(1);
+          Serial.println(direction);
+          break;
+        }
+      case 's':
+        // right
+        {
+          setmotor(2);
+          break;
+        }
+      case 'x':
+        {
+          setmotor(0);
+          Serial.println(direction);
+          break;
+        }
+      default:
+        break;
     }
+    // if (rpm1 < 10 && mspeed1 > 200) {
+    //   mspeed1 = 30;
+    // }
+    // if (rpm2 < 10 && mspeed2 > 200) {
+    //   mspeed2 = 30;
+    // }
     encoderValue1 = 0;
     encoderValue2 = 0;
+    
   }
 }
 
@@ -179,6 +194,7 @@ void EncoderInit() {
   attachInterrupt(digitalPinToInterrupt(HALLSEN_A2), updateEncoder2, RISING);
   attachInterrupt(digitalPinToInterrupt(HALLSEN_B2), updateEncoder2, RISING);
 }
+
 void updateEncoder() {
   // Read both channels of the encoder to determine direction
   int channelA1 = digitalRead(HALLSEN_A);
@@ -202,94 +218,55 @@ void updateEncoder2() {
     encoderValue2++;
   }
 }
+
 void setmotor(int dir) {
   if (dir == 1) {
-    do {
-      currentMillis = millis();
-      if (currentMillis - previousMillis > interval) {
-        previousMillis = currentMillis;
-        rpm1 = (float)(encoderValue1 * 60 / (ENCODEROUTPUT));  // Divide by 2 for 2-phase encoding
-        rpm2 = (float)(encoderValue2 * 60 / (ENCODEROUTPUT));  // Divide by 2 for 2-phase encoding
-        diff1 = abs(setPoint - rpm1);
-        diff2 = abs(setPoint - rpm2);
-        if (rpm1 > setPoint) {
-          motorPwm1 = motorPwm1 - diff1 * (1 + ratio_value);
-        } else if (rpm1 < setPoint) {
-          motorPwm1 = motorPwm1 + diff1 * (1 + ratio_value);
-        }
-        if (rpm2 > setPoint) {
-          motorPwm2 = motorPwm2 - diff2 * (1 + ratio_value);
-        } else if (rpm2 < setPoint) {
-          motorPwm2 = motorPwm2 + diff2 * (1 + ratio_value);
-        }
+    digitalWrite(motorDir2, 1);
+    digitalWrite(motorDir, 0);
+    analogWrite(motorPWM, mspeed1);
+    digitalWrite(motor2Dir2, 1);
+    digitalWrite(motor2Dir, 0);
+    analogWrite(motor2PWM, mspeed2);
+  }
 
-        mspeed1 = abs(motorPwm1);
-        if (mspeed1 > 255) {
-          mspeed1 = 255;
-        }
-        mspeed2 = abs(motorPwm2);
-        if (mspeed2 > 255) {
-          mspeed2 = 255;
-        }
-
-        digitalWrite(motorDir2, 1);
-        digitalWrite(motorDir, 0);
-        analogWrite(motorPWM, mspeed1);
-        digitalWrite(motor2Dir2, 1);
-        digitalWrite(motor2Dir, 0);
-        analogWrite(motor2PWM, mspeed2);
-        Serial.print("Speed1: ");
-        Serial.print(mspeed1);
-        Serial.print(", Speed2: ");
-        Serial.print(mspeed2);
-        Serial.print(", RPM1: ");
-        Serial.print(rpm1);
-        Serial.print(", RPM2: ");
-        Serial.println(rpm2);
-        encoderValue1 = 0;
-        encoderValue2 = 0;
-      }
-    } while (setPoint != rpm1 || setPoint != rpm2);
-
-    if (dir == 2) {
-      digitalWrite(motorDir2, 0);
-      digitalWrite(motorDir, 1);
-      analogWrite(motorPWM, mspeed1);
-      digitalWrite(motor2Dir2, 0);
-      digitalWrite(motor2Dir, 1);
-      analogWrite(motor2PWM, mspeed2);
-    }
-    if (dir == 3) {
-      digitalWrite(motorDir2, HIGH);
-      digitalWrite(motorDir, LOW);
-      analogWrite(motorPWM, mspeed1);
-      digitalWrite(motor2Dir2, !HIGH);
-      digitalWrite(motor2Dir, !LOW);
-      analogWrite(motor2PWM, 0);
-    }
-    if (dir == 4) {
-      digitalWrite(motor2Dir2, HIGH);
-      digitalWrite(motor2Dir, LOW);
-      analogWrite(motor2PWM, mspeed2);
-      digitalWrite(motorDir2, !HIGH);
-      digitalWrite(motorDir, !LOW);
-      analogWrite(motorPWM, 0);
-    }
-    if (dir == 5) {
-      digitalWrite(motorDir2, HIGH);
-      digitalWrite(motorDir, LOW);
-      analogWrite(motorPWM, mspeed1);
-      digitalWrite(motor2Dir2, LOW);
-      digitalWrite(motor2Dir, HIGH);
-      analogWrite(motor2PWM, mspeed2);
-    }
-    if (dir == 0) {
-      digitalWrite(motorDir2, HIGH);
-      digitalWrite(motorDir, LOW);
-      analogWrite(motorPWM, 0);
-      digitalWrite(motor2Dir2, HIGH);
-      digitalWrite(motor2Dir, LOW);
-      analogWrite(motor2PWM, 0);
-    }
+  if (dir == 2) {
+    digitalWrite(motorDir2, 0);
+    digitalWrite(motorDir, 1);
+    analogWrite(motorPWM, mspeed1);
+    digitalWrite(motor2Dir2, 0);
+    digitalWrite(motor2Dir, 1);
+    analogWrite(motor2PWM, mspeed2);
+  }
+  if (dir == 3) {
+    digitalWrite(motorDir2, HIGH);
+    digitalWrite(motorDir, LOW);
+    analogWrite(motorPWM, mspeed1);
+    digitalWrite(motor2Dir2, !HIGH);
+    digitalWrite(motor2Dir, !LOW);
+    analogWrite(motor2PWM, 0);
+  }
+  if (dir == 4) {
+    digitalWrite(motor2Dir2, HIGH);
+    digitalWrite(motor2Dir, LOW);
+    analogWrite(motor2PWM, mspeed2);
+    digitalWrite(motorDir2, !HIGH);
+    digitalWrite(motorDir, !LOW);
+    analogWrite(motorPWM, 0);
+  }
+  if (dir == 5) {
+    digitalWrite(motorDir2, HIGH);
+    digitalWrite(motorDir, LOW);
+    analogWrite(motorPWM, mspeed1);
+    digitalWrite(motor2Dir2, LOW);
+    digitalWrite(motor2Dir, HIGH);
+    analogWrite(motor2PWM, mspeed2);
+  }
+  if (dir == 0) {
+    digitalWrite(motorDir2, HIGH);
+    digitalWrite(motorDir, LOW);
+    analogWrite(motorPWM, 0);
+    digitalWrite(motor2Dir2, HIGH);
+    digitalWrite(motor2Dir, LOW);
+    analogWrite(motor2PWM, 0);
   }
 }
